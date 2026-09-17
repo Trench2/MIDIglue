@@ -41,11 +41,6 @@ except ImportError:
     )
     sys.exit(1)
 
-
-# =============================================================================
-# General MIDI instrument list (program numbers 0-127, in order)
-# =============================================================================
-
 GM_INSTRUMENTS = [
     "Acoustic Grand Piano", "Bright Acoustic Piano", "Electric Grand Piano", "Honky-tonk Piano",
     "Electric Piano 1", "Electric Piano 2", "Harpsichord", "Clavinet",
@@ -82,12 +77,8 @@ GM_INSTRUMENTS = [
 ]
 assert len(GM_INSTRUMENTS) == 128
 
-# Display the GM program numbers as 1-128 in the UI, while the actual MIDI
-# program numbers remain 0-127 internally.
 GM_INSTRUMENTS = [f"{i + 1}  {name}" for i, name in enumerate(GM_INSTRUMENTS)]
 
-# General MIDI Level 2 standard drum kits, selected via Program Change on channel 10.
-# (name, program number)
 DRUM_KITS = [
     ("0  Standard Kit", 0),
     ("8  Room Kit", 8),
@@ -99,18 +90,6 @@ DRUM_KITS = [
     ("48  Orchestra Kit", 48),
     ("56  SFX Kit", 56),
 ]
-
-# =============================================================================
-# Low-level Standard MIDI File reading / writing (no external dependencies)
-#
-# Each event is represented as a list: [delta, kind, subtype, channel, payload]
-#   kind == 'midi'  -> subtype = status high-nibble (0x80..0xE0), channel 0-15,
-#                       payload = the 1-2 raw data bytes
-#   kind == 'meta'  -> subtype = meta type byte, channel = None,
-#                       payload = raw meta data bytes
-#   kind == 'sysex' -> subtype = 0xF0 or 0xF7, channel = None,
-#                       payload = raw sysex data bytes
-# =============================================================================
 
 class MidiFormatError(Exception):
     """Raised when a file can't be parsed as a standard MIDI file."""
@@ -155,7 +134,6 @@ def parse_track(data):
             if running_status is None:
                 raise MidiFormatError(f"Corrupt MIDI data: expected a status byte at position {pos}")
             status = running_status
-            # pos is NOT advanced here -- 'peek' is the first data byte of this event
 
         if status == 0xFF:
             meta_type = data[pos]
@@ -313,9 +291,9 @@ def build_channel_track(events, target_channel, program, scale, label, transpose
         keep = True
         if kind == 'meta' and subtype in DROP_META_FROM_CHANNEL_TRACK:
             keep = False
-        elif kind == 'midi' and subtype == 0xC0:  # drop original program changes; we set our own
+        elif kind == 'midi' and subtype == 0xC0:  
             keep = False
-        elif kind == 'sysex':  # dropped for simplicity
+        elif kind == 'sysex':  
             keep = False
         if not keep:
             carry += scaled
@@ -326,7 +304,7 @@ def build_channel_track(events, target_channel, program, scale, label, transpose
             if subtype in (0x80, 0x90) and len(payload) >= 2:
                 payload = transpose_note_events(payload, transpose)
             new_events.append([total, 'midi', subtype, target_channel, payload])
-        else:  # a meta event we chose to keep (lyrics/markers/text/etc.)
+        else:  
             new_events.append([total, 'meta', subtype, None, payload])
     new_events.append([carry, 'meta', META_END_OF_TRACK, None, b''])
     return new_events
